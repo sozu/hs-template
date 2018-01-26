@@ -1,0 +1,11 @@
+{-# extends import2.txt #-}
+{-@ b0 -}
+abc
+{-$-}
+{-@ b1 -}
+---
+{-$-}
+{-& macro.txt $-}
+{-* macro2 a1 a2 -}
+macro2 {- a1 -} {- a2 -}
+{-$-}

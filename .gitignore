@@ -1,0 +1,4 @@
+.stack-work/
+hs-template.cabal
+*~
+**/.DS_Store

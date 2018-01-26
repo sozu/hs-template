@@ -1,0 +1,1 @@
+abc{- s -}{-| t = "ghi" -}{-< include2.txt -}mno{-$-}

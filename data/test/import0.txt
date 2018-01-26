@@ -1,0 +1,7 @@
+{-# extends import1.txt #-}
+{-@ b1 -}
+ghi
+{-$-}
+{-@ b2 -}
+mno
+{-$-}
