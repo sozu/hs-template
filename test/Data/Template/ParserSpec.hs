@@ -78,13 +78,13 @@ spec = do
             let template = parseTemplateFile "data/test/import1.txt"
             let c = newContext { rootPath = "data/test" }
             c' <- resolveContext c True template 
-            M.toList (blocks c') `shouldContain` [("b0", [RawNode "abc\r\n"]), ("b1", [RawNode "---\r\n"])]
-            M.toList (macros c') `shouldContain` [ ("macro1", (["s"], [TagNode (Eval "s ") [], RawNode "\r\n"]))
+            M.toList (blocks c') `shouldContain` [("b0", [RawNode "abc\n"]), ("b1", [RawNode "---\n"])]
+            M.toList (macros c') `shouldContain` [ ("macro1", (["s"], [TagNode (Eval "s ") [], RawNode "\n"]))
                                                  , ("macro2", (["a1", "a2"], [ RawNode "macro2 "
                                                                              , TagNode (Eval "a1 ") []
                                                                              , RawNode " "
                                                                              , TagNode (Eval "a2 ") []
-                                                                             , RawNode "\r\n"
+                                                                             , RawNode "\n"
                                                                              ]))
                                                  ]
 

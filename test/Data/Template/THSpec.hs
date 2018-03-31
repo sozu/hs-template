@@ -149,13 +149,13 @@ spec = do
         it "3 level hierarchy, macro import and file inclusion" $ do
             $(
                 execTemplateHierarchy generateExp newContext "data/test/import0.txt"
-             ) `shouldBe` "abc\r\n\
-                          \def\r\n\
-                          \ghi\r\n\
-                          \jkl\r\n\
-                          \mno\r\n\
-                          \pqr\r\n\
-                          \stu\r\n\
-                          \vwx\r\n\
+             ) `shouldBe` "abc\n\
+                          \def\n\
+                          \ghi\n\
+                          \jkl\n\
+                          \mno\n\
+                          \pqr\n\
+                          \stu\n\
+                          \vwx\n\
                           \"
 
