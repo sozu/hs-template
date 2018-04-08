@@ -6,6 +6,7 @@ module Data.Template (
     , (+=), (?+=)
     , generateExp
     , currentModules
+    , importedModules
     , renderRuntime
     , renderDynamic
     , renderDynamicWithContext

@@ -33,6 +33,7 @@ dependencies:
 - time
 - ghc
 - ghc-paths
+- ghc-boot-th
 
 library:
   source-dirs: src

@@ -3,6 +3,7 @@
 
 module Data.Template.Exp (
     getExp
+    , getType
 ) where
 
 import qualified Data.List as L
@@ -220,3 +221,55 @@ getExp s = do
     case parse infixexp "" s of
         Left e -> E.throw $ TemplateExprException (show e)
         Right r -> return r
+
+tyvar :: Parsec String u Type
+tyvar = do
+    try $ lookAhead lower
+    v <- identifier hs
+    return $ VarT (mkName v)
+
+gtycon :: Parsec String u Type
+gtycon = do
+    q <- optionMaybe $ try qualifier
+    try $ lookAhead upper
+    con <- identifier hs
+    return $ ConT (mkName $ maybe "" (\q' -> q' ++ ".") q ++ con)
+
+tupt :: Parsec String u Type
+tupt = do
+    ts <- ((parens hs) ((commaSep1 hs) typ))
+    return $ app ((TupleT $ length ts) : ts)
+    where
+        app :: [Type] -> Type
+        app (a:[]) = a
+        app (a:b:ts) = app ((AppT a b) : ts)
+
+listt :: Parsec String u Type
+listt = do
+    t <- (brackets hs) typ
+    return $ AppT ListT t 
+
+btype :: Parsec String u Type
+btype = do
+    as <- many1 atype
+    return $ app as
+    where
+        app :: [Type] -> Type
+        app (a:[]) = a
+        app (a:b:ts) = app ((AppT a b) : ts)
+
+atype :: Parsec String u Type
+atype = try gtycon
+    <|> try tyvar
+    <|> try tupt
+    <|> try listt
+    <|> ((parens hs) typ)
+
+typ :: Parsec String u Type
+typ = btype
+
+getType :: String
+        -> Maybe Type
+getType s = case parse typ "" s of
+                Left e -> Nothing
+                Right r -> Just r

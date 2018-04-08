@@ -15,5 +15,5 @@ main :: IO ()
 main = do
     cache <- newIORef Nothing
     let context = newContext += ("s", [| "abc" |])
-    r <- renderRuntime context "data/test/out.txt" $(currentModules) cache
+    r <- renderRuntime context "data/test/out.txt" $(currentModules) id cache
     putStrLn r

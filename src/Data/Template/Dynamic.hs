@@ -4,8 +4,9 @@
 
 module Data.Template.Dynamic where
 
-import GHC
+import GHC hiding (Module, ValD)
 import GHC.Paths
+import GHC.LanguageExtensions.Type
 import DynFlags
 import System.Directory
 import Control.Applicative
@@ -27,9 +28,11 @@ import Debug.Trace
 --
 -- Splice the result of this function to make second argument of @renderRuntime@.
 currentModules :: ExpQ -- ^ Expression holding names of modules current module imports.
-currentModules = do
-    this <- thisModule
-    ModuleInfo mods <- reifyModule this
+currentModules = thisModule >>= importedModules
+
+importedModules :: Module -> ExpQ
+importedModules m = do
+    ModuleInfo mods <- reifyModule m
     listE $ map (\(p, m) -> [| m |]) $ filter ((/= "main") . fst) $ map (\(Module (PkgName p) (ModName m)) -> (p, m)) mods
 
 -- | Render a template in runtime.
@@ -45,17 +48,20 @@ currentModules = do
 renderRuntime :: RenderContext -- ^ Rendering context.
               -> FilePath -- ^ File path of the template.
               -> [String] -- ^ Module names needed to compile the template.
+              -> (Exp -> Exp) -- ^ Expression modifier.
               -> IORef (Maybe (UTCTime, Exp)) -- ^ Cache of the expression of the template.
               -> IO String -- ^ Rendered string.
-renderRuntime context path mods cache = runQ $ do -- Q
+renderRuntime context path mods f cache = runQ $ do -- Q
     exp <- renderDynamicWithContext context path cache
     runIO $ runGhc (Just libdir) $ do -- GhcMonad
-        defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
+        --defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
+        withCleanupSession $ do
+            liftIO $ putStrLn $ "Loaded modules = " ++ show mods
             dynFlags <- getSessionDynFlags
-            setSessionDynFlags dynFlags
-            let mods' = L.union mods ["Data.Template.Model"]
+            setSessionDynFlags (foldl xopt_set dynFlags [DataKinds, TypeOperators, FlexibleContexts, OverloadedLabels])
+            let mods' = L.union mods ["GHC.Base", "Data.Template.Model", "Data.Foldable", "GHC.List", "GHC.Types"]
             setContext $ (map (IIDecl . simpleImportDecl . mkModuleName) mods')
-            d <- dynCompileExpr $ (show $ ppr exp)
+            d <- dynCompileExpr $ (show $ ppr (f exp))
             return $ fromJust $ fromDynamic @String d
 
 -- | Get the expression of the template with empty context.
