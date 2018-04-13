@@ -14,6 +14,9 @@ import Data.Template
 main :: IO ()
 main = do
     cache <- newIORef Nothing
-    let context = newContext += ("s", [| "abc" |])
-    r <- renderRuntime context "data/test/out.txt" $(currentModules) id cache
+    let context = newContext
+    let arg = ["abc", "def", "ghi"]
+    --t <- runQ [t| [String] |]
+    let t = AppT ListT $ ConT $ mkName "String"
+    r <- renderRuntime context "data/test/main.txt" $(currentModules) (arg, "it", t) cache
     putStrLn r

@@ -56,7 +56,10 @@ foldExp [] = [| "" |]
 foldExp qs = foldl1 concat' qs
     where
         concat' :: ExpQ -> ExpQ -> ExpQ
-        concat' q1 q2 = [| repr $(q1) ++ repr $(q2) |]
+        --concat' q1 q2 = [| repr $(q1) ++ repr $(q2) |]
+        concat' q1 q2 = infixE (Just $ appE (varE $ mkName "repr") q1) 
+                               (varE $ mkName "++")
+                               (Just $ appE (varE $ mkName "repr") q2)
 
 {- | Get an expression of the first value whose condition is true.
 -}
@@ -106,15 +109,19 @@ generateExp :: RenderContext -- ^ Rendering context.
             -> TagNode -- ^ A tag node.
             -> ExpQ -- ^ An expression for the representation of the node.
 generateExp _ (RawNode s) = [| s |]
-generateExp c (TagNode (Eval s) ts) = [| repr $(letC c (getExpr s)) |]
+generateExp c (TagNode (Eval s) ts) = [| $(varE $ mkName "repr") $(letC c (getExpr s)) |]
 generateExp c (TagNode (Def k v) ts) = let c' = c += (k, getExpr v) in generates c' ts
 generateExp c (TagNode (Includes f) ts) = execTemplateHierarchy generateExp c f
 generateExp c (TagNode (Block n) ts) = maybe [| "" |] (generates c) (M.lookup n (blocks c))
 generateExp c (TagNode (Call n args) ts) = callMacro c n args
 generateExp c (TagNode (For v vs i) ts) = [|
-        let values = $(getExpr vs)
+        let values = $(letC c (getExpr vs))
             generate = \(v_, i_) -> $(generates (c += (v, varE 'v_) ?+= (i, varE 'i_)) ts)
-        in foldl (++) "" $ map generate (zip values ([0..] :: [Int])) -- Type signature is required to apply repr to literal number.
+        in $(varE $ mkName "foldl")
+                $(varE $ mkName "++")
+                ""
+                -- Type signature is required to apply repr to literal number.
+                ($(varE $ mkName "map") generate ($(varE $ mkName "zip") values ([0..] :: [$(conT $ mkName "Int")])))
     |]
 generateExp c (IfNode ifs fallback) =
     let clauses = ifs ++ [maybe ("", []) ("", ) fallback]

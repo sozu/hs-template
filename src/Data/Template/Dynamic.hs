@@ -1,10 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Template.Dynamic where
 
-import GHC hiding (Module, ValD)
+import GHC hiding (Module, ValD, Type)
 import GHC.Paths
 import GHC.LanguageExtensions.Type
 import DynFlags
@@ -24,45 +25,47 @@ import Data.Template.Model
 import Data.Template.TH
 import Debug.Trace
 
--- | Get an expression holding names of modules current module imports.
+-- | Get an expression of a list holding names of modules current module imports.
 --
--- Splice the result of this function to make second argument of @renderRuntime@.
-currentModules :: ExpQ -- ^ Expression holding names of modules current module imports.
+-- Splice the result of this function to make thied argument of @renderRuntime@.
+currentModules :: ExpQ -- ^ Expression of the list.
 currentModules = thisModule >>= importedModules
 
-importedModules :: Module -> ExpQ
+-- | Get an expression of a list holding names of modules imported by a module.
+importedModules :: Module -- ^ Module.
+                -> ExpQ -- ^ Expression of the list.
 importedModules m = do
     ModuleInfo mods <- reifyModule m
     listE $ map (\(p, m) -> [| m |]) $ filter ((/= "main") . fst) $ map (\(Module (PkgName p) (ModName m)) -> (p, m)) mods
 
 -- | Render a template in runtime.
 --
--- Module names MUST contain modules which directly define every functios used in the template.
--- In case @A.f@ is exported through @B@, module importing @B@ have to import @A@ as well
--- in order to render the template with this function.
--- Inside this function, @Data.Template.Model@ is added to the module list because it defines @repr@ used in most cases.
+-- This function compile template into an expression of a function which takes an argument.
+-- The tuple of 4th argument contains its value, name (variable name used in the template) and type.
 --
 -- TODO
 -- Currently, any special import (qualified, hiding, etc) is completely ignored and all listed modules are imported.
--- This can cause the compilation error if a name conflicts or some other reasons.
-renderRuntime :: RenderContext -- ^ Rendering context.
+-- This can cause the compilation error by conflict of names or some other reasons.
+renderRuntime :: forall a. (Typeable a)
+              => RenderContext -- ^ Rendering context.
               -> FilePath -- ^ File path of the template.
               -> [String] -- ^ Module names needed to compile the template.
-              -> (Exp -> Exp) -- ^ Expression modifier.
+              -> (a, String, Type) -- ^ Argument and its name and type to give compiled function.
               -> IORef (Maybe (UTCTime, Exp)) -- ^ Cache of the expression of the template.
               -> IO String -- ^ Rendered string.
-renderRuntime context path mods f cache = runQ $ do -- Q
+renderRuntime context path mods (arg, key, t) cache = runQ $ do -- Q
     exp <- renderDynamicWithContext context path cache
     runIO $ runGhc (Just libdir) $ do -- GhcMonad
         --defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
         withCleanupSession $ do
-            liftIO $ putStrLn $ "Loaded modules = " ++ show mods
+            --liftIO $ putStrLn $ "Loaded modules = " ++ show mods
             dynFlags <- getSessionDynFlags
-            setSessionDynFlags (foldl xopt_set dynFlags [DataKinds, TypeOperators, FlexibleContexts, OverloadedLabels])
-            let mods' = L.union mods ["GHC.Base", "Data.Template.Model", "Data.Foldable", "GHC.List", "GHC.Types"]
+            setSessionDynFlags (foldl xopt_set dynFlags [DataKinds, TypeOperators, FlexibleContexts, OverloadedLabels, ScopedTypeVariables])
+            let mods' = L.union mods ["Data.Template"]
             setContext $ (map (IIDecl . simpleImportDecl . mkModuleName) mods')
-            d <- dynCompileExpr $ (show $ ppr (f exp))
-            return $ fromJust $ fromDynamic @String d
+            let f = LamE [SigP (VarP $ mkName key) t] exp
+            d <- dynCompileExpr $ (show $ ppr f)
+            return $ (fromJust $ fromDynamic @(a -> String) d) arg
 
 -- | Get the expression of the template with empty context.
 renderDynamic :: FilePath -- ^ File path of the template.

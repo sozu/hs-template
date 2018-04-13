@@ -4,6 +4,7 @@ module Data.Template (
     , RenderContext(..)
     , newContext
     , (+=), (?+=)
+    , Repr(..)
     , generateExp
     , currentModules
     , importedModules
