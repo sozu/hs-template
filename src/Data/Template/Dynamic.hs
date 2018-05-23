@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.Template.Dynamic where
 
@@ -15,7 +16,8 @@ import Control.Monad.IO.Class
 import Data.Dynamic
 import Data.IORef
 import Data.Time
-import Data.Maybe (fromJust)
+import Data.Data
+import Data.Maybe (fromJust, catMaybes)
 import qualified Data.List as L
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
@@ -24,6 +26,11 @@ import Language.Haskell.TH.Ppr
 import Data.Template.Model
 import Data.Template.TH
 import Debug.Trace
+
+data RuntimeImport = Add String
+                   | Qualify String String Bool
+                   | Hide String
+                   deriving (Eq, Show, Data)
 
 -- | Get an expression of a list holding names of modules current module imports.
 --
@@ -36,7 +43,19 @@ importedModules :: Module -- ^ Module.
                 -> ExpQ -- ^ Expression of the list.
 importedModules m = do
     ModuleInfo mods <- reifyModule m
-    listE $ map (\(p, m) -> [| m |]) $ filter ((/= "main") . fst) $ map (\(Module (PkgName p) (ModName m)) -> (p, m)) mods
+
+    runtimes <- reifyAnnotations (AnnLookupModule m) :: Q [RuntimeImport]
+    let moduleNames = catMaybes $ map (isAvailable $ hideModules runtimes) mods
+
+    listE $ map (\m -> [| m |]) moduleNames
+    where
+        hideModules :: [RuntimeImport] -> [String]
+        hideModules [] = []
+        hideModules (Hide m:ms) = m : hideModules ms
+        hideModules (m:ms) = hideModules ms
+
+        isAvailable :: [String] -> Module -> Maybe String
+        isAvailable hides (Module (PkgName p) (ModName m)) = if p /= "main" && not (m `elem` hides) then Just m else Nothing
 
 -- | Render a template in runtime.
 --

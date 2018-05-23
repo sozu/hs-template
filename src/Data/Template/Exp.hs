@@ -237,8 +237,10 @@ gtycon = do
 
 tupt :: Parsec String u Type
 tupt = do
-    ts <- ((parens hs) ((commaSep1 hs) typ))
-    return $ app ((TupleT $ length ts) : ts)
+    ts <- ((parens hs) ((commaSep hs) typ))
+    return $ case length ts of
+                0 -> TupleT 0
+                i -> app ((TupleT i) : ts)
     where
         app :: [Type] -> Type
         app (a:[]) = a

@@ -6,6 +6,7 @@ module Data.Template (
     , (+=), (?+=)
     , Repr(..)
     , generateExp
+    , RuntimeImport(..)
     , currentModules
     , importedModules
     , renderRuntime

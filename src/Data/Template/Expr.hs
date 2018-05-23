@@ -327,8 +327,10 @@ gtycon = do
 -- | Parses a tuple type ((typ1, ..., typN)).
 tupt :: Parsec String u TypeQ
 tupt = do
-    ts <- ((parens hs) ((commaSep1 hs) typ))
-    return $ app ((tupleT $ length ts) : ts)
+    ts <- ((parens hs) ((commaSep hs) typ))
+    return $ case length ts of
+                0 -> tupleT 0
+                i -> app ((tupleT i) : ts)
     where
         app :: [TypeQ] -> TypeQ
         app (a:[]) = a
