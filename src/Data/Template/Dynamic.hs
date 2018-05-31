@@ -70,14 +70,13 @@ renderRuntime :: forall a. (Typeable a)
               -> FilePath -- ^ File path of the template.
               -> [String] -- ^ Module names needed to compile the template.
               -> (a, String, Type) -- ^ Argument and its name and type to give compiled function.
-              -> IORef (Maybe (UTCTime, Exp)) -- ^ Cache of the expression of the template.
+              -> IORef (Maybe (String, UTCTime, Exp)) -- ^ Cache of the expression of the template.
               -> IO String -- ^ Rendered string.
 renderRuntime context path mods (arg, key, t) cache = runQ $ do -- Q
     exp <- renderDynamicWithContext context path cache
     runIO $ runGhc (Just libdir) $ do -- GhcMonad
         --defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
         withCleanupSession $ do
-            --liftIO $ putStrLn $ "Loaded modules = " ++ show mods
             dynFlags <- getSessionDynFlags
             setSessionDynFlags (foldl xopt_set dynFlags [DataKinds, TypeOperators, FlexibleContexts, OverloadedLabels, ScopedTypeVariables])
             let mods' = L.union mods ["Data.Template"]
@@ -88,7 +87,7 @@ renderRuntime context path mods (arg, key, t) cache = runQ $ do -- Q
 
 -- | Get the expression of the template with empty context.
 renderDynamic :: FilePath -- ^ File path of the template.
-              -> IORef (Maybe (UTCTime, Exp)) -- ^ Cache of the expression of the template.
+              -> IORef (Maybe (String, UTCTime, Exp)) -- ^ Cache of the expression of the template.
               -> ExpQ -- ^ Rendered expression.
 renderDynamic path cache = fst <$> renderDynamic' newContext path cache
 
@@ -100,30 +99,30 @@ renderDynamic path cache = fst <$> renderDynamic' newContext path cache
 -- Otherwise, the expression in the cache is returned.
 renderDynamicWithContext :: RenderContext -- ^ Rendering context.
                          -> FilePath -- ^ File path of the template.
-                         -> IORef (Maybe (UTCTime, Exp)) -- ^ Cache of the expression of the template.
+                         -> IORef (Maybe (String, UTCTime, Exp)) -- ^ Cache of the expression of the template.
                          -> ExpQ -- ^ Rendered expression.
 renderDynamicWithContext context path cache = fst <$> renderDynamic' context path cache
 
 renderDynamic' :: RenderContext
                -> FilePath
-               -> IORef (Maybe (UTCTime, Exp))
+               -> IORef (Maybe (String, UTCTime, Exp))
                -> Q (Exp, Bool)
 renderDynamic' context path cache = do
     c <- runIO $ readIORef cache
     modifiedAt <- runIO $ getModificationTime path
 
     case c of
-        Just (t, exp) -> do
+        Just (n, t, exp) -> do
             if modifiedAt <= t then return (exp, False)
                                else reloadExp context path cache modifiedAt
         Nothing -> reloadExp context path cache modifiedAt
     where
         reloadExp :: RenderContext
                   -> FilePath
-                  -> IORef (Maybe (UTCTime, Exp))
+                  -> IORef (Maybe (String, UTCTime, Exp))
                   -> UTCTime
                   -> Q (Exp, Bool)
         reloadExp context path cache modifiedAt = do
             exp <- renderWithContext context path
             c <- runIO $ readIORef cache
-            runIO $ writeIORef cache (Just (modifiedAt, exp)) >> return (exp, True)
+            runIO $ writeIORef cache (Just (path, modifiedAt, exp)) >> return (exp, True)
