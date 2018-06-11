@@ -45,7 +45,7 @@ importedModules m = do
     ModuleInfo mods <- reifyModule m
 
     runtimes <- reifyAnnotations (AnnLookupModule m) :: Q [RuntimeImport]
-    let moduleNames = catMaybes $ map (isAvailable $ hideModules runtimes) mods
+    let moduleNames = catMaybes $ map (isAvailable $ hideModules runtimes) (m:mods)
 
     listE $ map (\m -> [| m |]) moduleNames
     where
